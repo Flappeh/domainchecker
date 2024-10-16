@@ -16,12 +16,15 @@ with open(file='./list.txt',mode='r',encoding='utf8') as f:
         if count > 10:
             break
     
-try:
-    for i in domain:
+for i in domain:
+    try:
         info = whois.whois(i)
-        print(info)
-except:
-    print("Error")
+        print(f"""
+Domain : {i}
+Registrar : {info["registrar"]}
+""")
+    except:
+        print(f"Error for domain : {i}")
 # dm_info =  whois.whois("ictincub.my.id") # 👉️ Get Domain Info
 
 # print(dm_info)

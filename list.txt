@@ -1,7 +1,9 @@
 wikidata.org
 wikimedia.org
 archive.org
+apapunni.com
 google.com
+infracom-tech.com
 geohack.toolforge.org
 mediawiki.org
 worldcat.org
