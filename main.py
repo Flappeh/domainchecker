@@ -1,30 +1,116 @@
-import whois # 👉️ Import whois module
+import whois 
+import multiprocessing
+from modules.utils import get_logger
+from typing import List
+import random
+import string
+import numpy as np
+import os
+
+logger = get_logger()
 
 
-domain = []
-taken = []
-availabile = []
+def store_error_log(err):
+    with open("data/error.log", 'a') as f:
+        f.write(err)
 
-
-
-with open(file='./list.txt',mode='r',encoding='utf8') as f:
-    count = 0
-    for i in f:
-        data = i.rstrip()
-        count += 1
-        domain.append(data)
-        if count > 10:
-            break
-    
-for i in domain:
+def open_file():
+    domain = []
     try:
-        info = whois.whois(i)
-        print(f"""
-Domain : {i}
-Registrar : {info["registrar"]}
-""")
-    except:
-        print(f"Error for domain : {i}")
-# dm_info =  whois.whois("ictincub.my.id") # 👉️ Get Domain Info
+        logger.info("Getting data from domains.txt file")
+        with open(file='data/domains.txt',mode='r',encoding='utf8') as f:
+            count = 0
+            for i in f:
+                # if count > 100:
+                #     break
+                if i == "" or i == None:
+                    continue
+                data = i.rstrip()
+                count += 1
+                domain.append(data)
+        return domain
+    except Exception as e:
+        logger.error("Error opening domains.txt file")
+        store_error_log(e)
+        raise
 
-# print(dm_info)
+def check_domain_job(list, results):
+    for i in list:
+        idx = ''.join(random.choices(string.ascii_uppercase + string.digits, k=12))
+        try:
+            for x in range(3):
+                try:
+                    info = whois.whois(i)
+                    logger.info(f"Domain : {i} UNAVAILABLE")
+                    results[f'taken-{idx}'] = i
+                    break
+                except Exception as e:
+                    if x == 2:
+                        raise
+                    pass
+        except Exception as e:
+            # logger.error(f"Error on looking up : {i}\n Details: {e}")
+            logger.debug(f"Domain : {i} AVAILABILE")
+            results[f'availabile-{idx}'] = i
+    return results
+                
+def split_chunks(list,n):
+    return np.array_split(list, n)
+
+
+def start_parsing_process():
+    taken = []
+    process_list = []
+    availabile = []
+    try:
+        # Start opening input file
+        manager = multiprocessing.Manager()
+        results = manager.dict()
+        results['availabile'] = []
+        results['taken'] = []
+        
+        domain_list = open_file()
+        data_chunks = split_chunks(domain_list,5)
+        for i in data_chunks:
+            proc = multiprocessing.Process(target=check_domain_job, args=(i,results))
+            process_list.append(proc)
+            proc.start()
+            
+        for i in process_list:
+            i.join()
+        for i in results:
+            if 'taken-' in i:
+                taken.append(results[i])
+            if 'availabile-' in i:
+                availabile.append(results[i])
+
+    except:
+        logger.error("Error occured on parsing process")
+        pass
+    finally:
+        logger.info("Finished parsing process")
+        store_results(taken, availabile)
+        
+def store_results(taken, availabile):
+    with open('data/unavailabile.txt', 'w') as f:
+        for i in taken:
+            f.write(i + '\n')
+    with open('data/availabile.txt', 'w') as f:
+        for i in availabile:
+            f.write(i + '\n')
+        
+def remove_old_files():
+    if os.path.exists('./data/unavailabile.txt'):
+        os.remove('./data/unavailabile.txt')
+    if os.path.exists('./data/availabile.txt'):
+        os.remove('./data/availabile.txt')
+    
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    # if sys.platform.startswith('win'):
+    #     # On Windows calling this function is necessary.
+    logger.info("Initializing application")
+    remove_old_files()
+    start_parsing_process()
+    
+    logger.info("Done processing domains list")
